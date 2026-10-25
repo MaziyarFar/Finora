@@ -1,11 +1,11 @@
 :root {
-  --inv: #a86b00;
+  --inv: #a86b00; --inv-bar: #e8b100;
   --bg: #f6f6f4; --card: #fff; --fg: #1d1d1f; --muted: #6e6e73; --line: #e3e3e0;
   --accent: #2f6f5e; --pos: #1f7a4d; --neg: #b3261e;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #111113; --card: #1c1c1f; --fg: #ececee; --muted: #9a9aa0; --line: #2c2c30;
-    --accent: #5fb39a; --pos: #5fc28a; --neg: #ff7a70; --inv: #f2c94c; }
+    --accent: #5fb39a; --pos: #5fc28a; --neg: #ff7a70; --inv: #f2c94c; --inv-bar: #f2c94c; }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
@@ -88,6 +88,7 @@ progress.over::-moz-progress-bar { background: var(--neg); }
 .chart .right small { margin-left: 6px; min-width: 2.6em; text-align: right; }
 .bar-track { height: 8px; margin-top: 8px; }
 .bar-fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.bar-fill.pos { background: var(--pos); } .bar-fill.neg { background: var(--neg); } .bar-fill.inv { background: var(--inv-bar); }
 .bar-fill.sub { opacity: .55; }
 .chart .subs { list-style: none; margin: 0; padding: 0 14px 12px 30px; font-size: .9rem; }
 .chart .subs li { padding: 6px 0; }

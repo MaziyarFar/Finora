@@ -267,7 +267,7 @@
     $('sum-net').className = inn - out - inv < 0 ? 'neg' : 'pos';
 
     renderCalendar(month, entries);
-    renderChart(entries);
+    for (const kind of Object.keys(CHARTS)) renderChart(entries, kind);
 
     const spent = new Map();
     for (const e of entries) if (e.kind === 'expense') spent.set(e.category, (spent.get(e.category) || 0) + e.amount);
@@ -362,42 +362,51 @@
     $('cal').replaceChildren(...cells);
   }
 
-  // Horizontal bars of the month's expenses per category, largest first.
-  // Tapping a category expands its sub-costs. Category bars are scaled to the largest
-  // category, sub-cost bars to their own category.
-  function renderChart(entries) {
+  const CHARTS = {
+    income: { empty: 'No income this month.', total: 'Total income' },
+    expense: { empty: 'No expenses this month.', total: 'Total spending' },
+    invest: { empty: 'No investments this month.', total: 'Total invested' },
+  };
+
+  // Horizontal bars of the month's entries of one kind per category, largest first.
+  // Tapping a category expands it by sub-cost, or by person when it has no sub-costs.
+  // Category bars are scaled to the largest category, sub bars to their own category.
+  function renderChart(entries, kind) {
+    const list = $('chart-' + kind);
+    const cls = KIND_CLASS[kind];
     const cats = new Map();
     let total = 0;
     for (const e of entries) {
-      if (e.kind !== 'expense') continue;
+      if (e.kind !== kind) continue;
       total += e.amount;
       const c = cats.get(e.category) || { sum: 0, subs: new Map() };
       c.sum += e.amount;
-      const sub = e.sub || 'Other';
+      const sub = e.sub || e.person || 'Other';
       c.subs.set(sub, (c.subs.get(sub) || 0) + e.amount);
       cats.set(e.category, c);
     }
-    if (!total) { $('cat-chart').replaceChildren(empty('No expenses this month.')); return; }
+    if (!total) { list.replaceChildren(empty(CHARTS[kind].empty)); return; }
     const rows = [...cats].sort((a, b) => b[1].sum - a[1].sum);
     const max = rows[0][1].sum;
     const pct = (v) => `${Math.round((v / total) * 100)}%`;
-    const bar = (v, cls, of = max) => { const b = el('div', { class: 'bar-fill ' + cls }); b.style.width = `${Math.max(1, (v / of) * 100)}%`; return el('div', { class: 'bar-track' }, b); };
-    $('cat-chart').replaceChildren(...rows.map(([name, c]) => {
-      const isOpen = S.open.has(name);
-      const head = el('button', { class: 'chart-row', 'aria-expanded': String(isOpen), title: `${name}: ${money(c.sum)} (${pct(c.sum)} of spending)`,
-        onclick: () => { if (isOpen) S.open.delete(name); else S.open.add(name); render(); } },
+    const bar = (v, sub, of = max) => { const b = el('div', { class: `bar-fill ${cls}${sub ? ' sub' : ''}` }); b.style.width = `${Math.max(1, (v / of) * 100)}%`; return el('div', { class: 'bar-track' }, b); };
+    list.replaceChildren(...rows.map(([name, c]) => {
+      const key = kind + ':' + name;
+      const isOpen = S.open.has(key);
+      const head = el('button', { class: 'chart-row', 'aria-expanded': String(isOpen), title: `${name}: ${money(c.sum)} (${pct(c.sum)})`,
+        onclick: () => { if (isOpen) S.open.delete(key); else S.open.add(key); render(); } },
         el('div', { class: 'row-between' },
           el('span', { text: (isOpen ? '▾ ' : '▸ ') + name }),
           el('span', { class: 'right' }, el('b', { text: money(c.sum) }), el('small', { class: 'muted', text: pct(c.sum) }))),
-        bar(c.sum, ''));
+        bar(c.sum, false));
       const li = el('li', {}, head);
       if (isOpen) {
         li.append(el('ul', { class: 'subs' }, ...[...c.subs].sort((a, b) => b[1] - a[1]).map(([sub, v]) => el('li', { title: `${sub}: ${money(v)}` },
           el('div', { class: 'row-between' }, el('span', { text: sub }), el('span', { class: 'right', text: money(v) })),
-          bar(v, 'sub', c.sum)))));
+          bar(v, true, c.sum)))));
       }
       return li;
-    }), el('li', { class: 'row-between chart-total' }, el('span', { text: 'Total spending' }), el('b', { text: money(total) })));
+    }), el('li', { class: 'row-between chart-total' }, el('span', { text: CHARTS[kind].total }), el('b', { text: money(total) })));
   }
 
   const status = (t) => { $('sync-status').textContent = t; };
