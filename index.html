@@ -42,9 +42,15 @@
   </header>
 
   <section id="view-month" class="view">
+    <div class="seg filter" id="person-filter" role="radiogroup" aria-label="Show entries for">
+      <label><input type="radio" name="who" value="" checked> All</label>
+      <label><input type="radio" name="who" value="A"> A</label>
+      <label><input type="radio" name="who" value="M"> M</label>
+    </div>
     <div class="stats">
       <div class="stat"><span>In</span><b id="sum-in" class="pos"></b></div>
       <div class="stat"><span>Out</span><b id="sum-out" class="neg"></b></div>
+      <div class="stat"><span>Invested</span><b id="sum-inv" class="inv"></b></div>
       <div class="stat"><span>Left</span><b id="sum-net"></b></div>
     </div>
     <div id="cal" class="cal" role="grid" aria-label="Calendar"></div>
@@ -66,9 +72,16 @@
       <div class="seg">
         <label><input type="radio" name="kind" value="expense" checked> Expense</label>
         <label><input type="radio" name="kind" value="income"> Income</label>
+        <label class="inv-opt"><input type="radio" name="kind" value="invest"> Investment</label>
+      </div>
+      <p class="field-label">Who</p>
+      <div class="seg">
+        <label><input type="radio" name="person" value="A" checked> A</label>
+        <label><input type="radio" name="person" value="M"> M</label>
       </div>
       <label>Amount <input name="amount" inputmode="decimal" required pattern="[0-9]+([.,][0-9]{1,2})?" maxlength="12"></label>
-      <label>Category <input name="category" list="cats" required maxlength="40"></label>
+      <label>Category <select name="category" required></select></label>
+      <label id="sub-wrap">Sub-cost <select name="sub"></select></label>
       <label>Note <input name="note" maxlength="100"></label>
       <label>Repeats
         <select name="freq">
@@ -81,7 +94,6 @@
       <button type="submit">Save</button>
       <p id="add-msg" class="muted" role="status"></p>
     </form>
-    <datalist id="cats"></datalist>
   </section>
 
   <section id="view-recurring" class="view" hidden>
@@ -92,7 +104,7 @@
   <section id="view-budgets" class="view" hidden>
     <h2>Monthly budgets</h2>
     <form id="budget-form" class="card row" autocomplete="off">
-      <input name="category" list="cats" placeholder="Category" required maxlength="40">
+      <select name="category" required aria-label="Category"></select>
       <input name="amount" inputmode="decimal" placeholder="Amount" required pattern="[0-9]+([.,][0-9]{1,2})?" maxlength="12">
       <button type="submit">Set</button>
     </form>

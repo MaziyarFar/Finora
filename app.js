@@ -11,6 +11,21 @@
   const DATA_PATH = 'finora.json';
   const LS_VAULT = 'finora.vault';
   const LS_CFG = 'finora.cfg';
+  const PEOPLE = ['A', 'M'];
+  // Expense categories and their sub-costs. Income and investment have one category each for now.
+  const EXPENSES = {
+    'Housing': ['Rent', 'Electricity', 'Additional Payment', 'Contents Insurance'],
+    'Car & Transportation': ['Car Loan', 'Fuel or Charge', 'Car Insurance', 'Car Maintenance & Servicing', 'Car Accessories', 'Parking Fees', 'Public Transportation'],
+    'Health & Personal Care': ['Personal Care & Hygiene', 'Health Insurance', 'Supplemental Health Insurance', 'Personal Liability Insurance', 'Gym Membership', 'Cosmetics & Perfume', 'Hair & Nail Care'],
+    'Food & Drinks': ['Groceries', 'Cafe', 'Restaurants & Dining'],
+    'Shopping': ['Electronics & Devices', 'Clothing', 'Household Items', 'Furniture Installments'],
+    'Subscriptions & Communication': ['Digital Subscriptions (Amazon, Apps, etc.)', 'Mobile Phone Plan', 'Home Internet', 'ZDF'],
+    'Travel & Leisure': ['Hotels & Accommodation', 'Travel Expenses', 'Entertainment & Leisure'],
+    'Gifts & Social': ['Gifts for Friends'],
+    'Taxes & Government Fees': ['Vehicle Tax (Kfz-Steuer)'],
+    'Loans & Debt': ['Bank Loan Repayments'],
+  };
+  const CATEGORIES = { expense: EXPENSES, income: { 'Salary': [] }, invest: { 'Investment': [] } };
   const enc = new TextEncoder();
   const dec = new TextDecoder();
   const $ = (id) => document.getElementById(id);
@@ -55,7 +70,7 @@
   // ---------- state ----------
   // S.data.items: { [id]: item }, each item has id, type, updatedAt and may be
   // a tombstone ({deleted:true}) so deletes sync across devices.
-  const S = { key: null, salt: null, iter: KDF_ITER, pass: null, data: null, cfg: null, month: null, day: null, syncing: false, again: false };
+  const S = { key: null, salt: null, iter: KDF_ITER, pass: null, data: null, cfg: null, month: null, day: null, person: null, syncing: false, again: false };
 
   const emptyData = () => ({ v: 1, currency: 'EUR', currencyAt: 0, items: {} });
   const uid = () => b64(crypto.getRandomValues(new Uint8Array(12))).replace(/[+/=]/g, (c) => ({ '+': '-', '/': '_', '=': '' }[c]));
@@ -97,8 +112,10 @@
     if (!Number.isInteger(i.amount) || i.amount < 0 || i.amount > 1e11) return false;
     if (typeof i.category !== 'string' || i.category.length > 40) return false;
     if (i.type === 'budget') return true;
-    if (!['income', 'expense'].includes(i.kind) || !isDate(i.date)) return false;
+    if (!['income', 'expense', 'invest'].includes(i.kind) || !isDate(i.date)) return false;
     if (typeof i.note !== 'string' || i.note.length > 100) return false;
+    if (i.sub != null && (typeof i.sub !== 'string' || i.sub.length > 60)) return false;
+    if (i.person != null && !PEOPLE.includes(i.person)) return false;
     if (i.type === 'tx') return true;
     if (i.type === 'rec') return ['weekly', 'monthly'].includes(i.freq) && (i.end == null || isDate(i.end));
     return false;
@@ -216,8 +233,9 @@
   }
 
   function monthEntries(month) {
-    const list = live('tx').filter((t) => ym(t.date) === month).map((t) => ({ ...t, recurring: false }));
-    for (const r of live('rec')) for (const d of occurrences(r, month)) list.push({ ...r, date: d, recurring: true });
+    const mine = (i) => !S.person || i.person === S.person;
+    const list = live('tx').filter((t) => ym(t.date) === month && mine(t)).map((t) => ({ ...t, recurring: false }));
+    for (const r of live('rec').filter(mine)) for (const d of occurrences(r, month)) list.push({ ...r, date: d, recurring: true });
     return list.sort((a, b) => b.date.localeCompare(a.date));
   }
 
@@ -239,12 +257,13 @@
     $('month-title').textContent = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
     const entries = monthEntries(month);
-    const inn = entries.filter((e) => e.kind === 'income').reduce((s, e) => s + e.amount, 0);
-    const out = entries.filter((e) => e.kind === 'expense').reduce((s, e) => s + e.amount, 0);
+    const total = (k) => entries.filter((e) => e.kind === k).reduce((s, e) => s + e.amount, 0);
+    const inn = total('income'), out = total('expense'), inv = total('invest');
     $('sum-in').textContent = money(inn);
     $('sum-out').textContent = money(out);
-    $('sum-net').textContent = money(inn - out);
-    $('sum-net').className = inn - out < 0 ? 'neg' : 'pos';
+    $('sum-inv').textContent = money(inv);
+    $('sum-net').textContent = money(inn - out - inv);
+    $('sum-net').className = inn - out - inv < 0 ? 'neg' : 'pos';
 
     renderCalendar(month, entries);
 
@@ -263,16 +282,16 @@
     $('tx-title').textContent = S.day ? 'Transactions · ' + dayLabel(S.day) : 'Transactions';
     $('day-actions').hidden = !S.day;
     $('tx-list').replaceChildren(...(shown.length ? shown.map((e) => el('li', { class: 'row-between' },
-      el('div', {}, el('div', { text: e.category + (e.recurring ? ' ↻' : '') }), el('small', { class: 'muted', text: e.date + (e.note ? ' · ' + e.note : '') })),
+      el('div', {}, el('div', { text: (e.sub || e.category) + (e.recurring ? ' ↻' : '') }), el('small', { class: 'muted', text: details(e, e.date) })),
       el('div', { class: 'right' },
-        el('b', { class: e.kind === 'income' ? 'pos' : 'neg', text: (e.kind === 'income' ? '+' : '−') + money(e.amount) }),
+        el('b', { class: KIND_CLASS[e.kind], text: (e.kind === 'income' ? '+' : '−') + money(e.amount) }),
         e.recurring ? '' : el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: () => confirm('Delete this entry?') && remove(e.id) }))))
       : [empty(S.day ? 'Nothing on this day.' : 'Nothing this month.')]));
 
     $('rec-list').replaceChildren(...(live('rec').length ? live('rec').sort((a, b) => a.category.localeCompare(b.category)).map((r) => el('li', { class: 'row-between' },
-      el('div', {}, el('div', { text: `${r.category} · ${r.freq}` }), el('small', { class: 'muted', text: `from ${r.date}` + (r.end ? ` to ${r.end}` : '') + (r.note ? ' · ' + r.note : '') })),
+      el('div', {}, el('div', { text: `${r.sub || r.category} · ${r.freq}` }), el('small', { class: 'muted', text: details(r, `from ${r.date}` + (r.end ? ` to ${r.end}` : '')) })),
       el('div', { class: 'right' },
-        el('b', { class: r.kind === 'income' ? 'pos' : 'neg', text: money(r.amount) }),
+        el('b', { class: KIND_CLASS[r.kind], text: money(r.amount) }),
         r.end ? '' : el('button', { class: 'link', text: 'Stop', onclick: () => { if (confirm('Stop from today? Past months keep it.')) put({ ...r, end: today() }); } }),
         el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: () => confirm('Delete everywhere, including past months?') && remove(r.id) }))))
       : [empty('No recurring items. Add one and pick "Every week" or "Every month".')]));
@@ -281,11 +300,27 @@
       el('span', { text: b.category }),
       el('div', { class: 'right' }, el('b', { text: money(b.amount) }), el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: () => remove(b.id) })))));
 
-    const cats = new Set([...live('tx'), ...live('rec'), ...live('budget')].map((i) => i.category));
-    $('cats').replaceChildren(...[...cats].sort().map((c) => el('option', { value: c })));
     $('currency-form').currency.value = S.data.currency;
     $('sync-form').repo.value = S.cfg.repo || '';
     if (!S.syncing) status(S.cfg.token ? (S.cfg.lastSync ? 'Last synced ' + new Date(S.cfg.lastSync).toLocaleString() : 'Not synced yet') : 'Sync is off. Only this device has your data.');
+  }
+
+  const KIND_CLASS = { income: 'pos', expense: 'neg', invest: 'inv' };
+  // Second line of a list row: main category (when a sub-cost is shown above), when, who, note.
+  const details = (i, when) => [i.sub ? i.category : '', when, i.person, i.note].filter(Boolean).join(' · ');
+
+  function fillSelect(sel, names, keep) {
+    sel.replaceChildren(...names.map((n) => el('option', { value: n, text: n })));
+    if (names.includes(keep)) sel.value = keep;
+  }
+  // Category and sub-cost lists follow the chosen entry type.
+  function syncAddSelects() {
+    const f = $('add-form');
+    const cats = CATEGORIES[f.kind.value];
+    fillSelect(f.category, Object.keys(cats), f.category.value);
+    const subs = cats[f.category.value] || [];
+    fillSelect(f.sub, subs, f.sub.value);
+    $('sub-wrap').hidden = !subs.length;
   }
 
   const dayLabel = (d) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -297,8 +332,8 @@
     const [y, m] = month.split('-').map(Number);
     const per = new Map();
     for (const e of entries) {
-      const t = per.get(e.date) || { in: 0, out: 0 };
-      if (e.kind === 'income') t.in += e.amount; else t.out += e.amount;
+      const t = per.get(e.date) || { in: 0, out: 0, inv: 0 };
+      if (e.kind === 'income') t.in += e.amount; else if (e.kind === 'invest') t.inv += e.amount; else t.out += e.amount;
       per.set(e.date, t);
     }
     const cells = [];
@@ -314,12 +349,13 @@
       const date = `${month}-${String(d).padStart(2, '0')}`;
       const t = per.get(date);
       const cls = ['day', date === now ? 'today' : '', date === S.day ? 'sel' : ''].join(' ').trim();
-      const label = dayLabel(date) + (t ? `: in ${money(t.in)}, out ${money(t.out)}` : '');
+      const label = dayLabel(date) + (t ? `: in ${money(t.in)}, out ${money(t.out)}, invested ${money(t.inv)}` : '');
       cells.push(el('button', { class: cls, 'aria-label': label, 'aria-pressed': String(date === S.day),
         onclick: () => { S.day = S.day === date ? null : date; render(); } },
         el('span', { class: 'dn', text: String(d) }),
         t?.in ? el('span', { class: 'pos', text: '+' + short(t.in) }) : '',
-        t?.out ? el('span', { class: 'neg', text: '−' + short(t.out) }) : ''));
+        t?.out ? el('span', { class: 'neg', text: '−' + short(t.out) }) : '',
+        t?.inv ? el('span', { class: 'inv', text: '−' + short(t.inv) }) : ''));
     }
     $('cal').replaceChildren(...cells);
   }
@@ -419,15 +455,24 @@
       document.querySelector('.tabs [data-view=add]').click();
     });
     $('prev').addEventListener('click', () => shift(-1));
+    $('add-form').addEventListener('change', (e) => { if (['kind', 'category'].includes(e.target.name)) syncAddSelects(); });
+    syncAddSelects();
+    fillSelect($('budget-form').category, Object.keys(EXPENSES));
+    $('person-filter').addEventListener('change', (e) => { S.person = PEOPLE.includes(e.target.value) ? e.target.value : null; render(); });
     $('next').addEventListener('click', () => shift(1));
 
     $('add-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const f = e.target;
       const amount = toCents(f.amount.value);
-      const category = clean(f.category.value, 40);
-      if (amount === null || !category || !isDate(f.date.value)) { toast('Check amount, category and date.'); return; }
-      const base = { id: uid(), kind: f.kind.value === 'income' ? 'income' : 'expense', amount, category, note: clean(f.note.value, 100), date: f.date.value };
+      const kind = Object.hasOwn(CATEGORIES, f.kind.value) ? f.kind.value : 'expense';
+      const cats = CATEGORIES[kind];
+      const category = f.category.value;
+      const subs = Object.hasOwn(cats, category) ? cats[category] : null;
+      const sub = subs?.length ? f.sub.value : null;
+      const person = PEOPLE.includes(f.person.value) ? f.person.value : null;
+      if (amount === null || !subs || (subs.length && !subs.includes(sub)) || !person || !isDate(f.date.value)) { toast('Check amount, category and date.'); return; }
+      const base = { id: uid(), kind, amount, category, sub, person, note: clean(f.note.value, 100), date: f.date.value };
       if (f.freq.value === 'once') put({ ...base, type: 'tx' });
       else put({ ...base, type: 'rec', freq: f.freq.value === 'weekly' ? 'weekly' : 'monthly', end: null });
       f.amount.value = f.note.value = '';
@@ -438,8 +483,8 @@
       e.preventDefault();
       const f = e.target;
       const amount = toCents(f.amount.value);
-      const category = clean(f.category.value, 40);
-      if (amount === null || !category) return;
+      const category = f.category.value;
+      if (amount === null || !Object.hasOwn(EXPENSES, category)) return;
       const existing = live('budget').find((b) => b.category.toLowerCase() === category.toLowerCase());
       put({ id: existing?.id || uid(), type: 'budget', category, amount });
       f.reset();

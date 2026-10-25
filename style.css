@@ -1,10 +1,11 @@
 :root {
+  --inv: #a86b00;
   --bg: #f6f6f4; --card: #fff; --fg: #1d1d1f; --muted: #6e6e73; --line: #e3e3e0;
   --accent: #2f6f5e; --pos: #1f7a4d; --neg: #b3261e;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #111113; --card: #1c1c1f; --fg: #ececee; --muted: #9a9aa0; --line: #2c2c30;
-    --accent: #5fb39a; --pos: #5fc28a; --neg: #ff7a70; }
+    --accent: #5fb39a; --pos: #5fc28a; --neg: #ff7a70; --inv: #f2c94c; }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
@@ -16,7 +17,7 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: 
 small { font-size: .8rem; }
 .muted { color: var(--muted); }
 .err { color: var(--neg); min-height: 1.4em; }
-.pos { color: var(--pos); } .neg { color: var(--neg); }
+.pos { color: var(--pos); } .neg { color: var(--neg); } .inv { color: var(--inv); }
 .screen, .view { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 .screen { padding-top: 15vh; }
 .screen h1 { font-size: 1.8rem; margin-bottom: 8px; }
@@ -44,7 +45,7 @@ button.icon { background: none; color: var(--fg); font-size: 1.6rem; padding: 0 
 .seg label:has(input:checked) { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .bar { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center;
   padding: 12px 4px; background: var(--bg); border-bottom: 1px solid var(--line); z-index: 1; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 16px; }
 .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
 .stat span { display: block; font-size: .8rem; color: var(--muted); }
 .stat b { font-size: 1.05rem; font-variant-numeric: tabular-nums; word-break: break-word; }
@@ -74,3 +75,10 @@ progress.over::-moz-progress-bar { background: var(--neg); }
 .cal .sel { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: -2px; }
 #day-actions { display: flex; }
 #tx-title { margin-top: 24px; }
+@media (min-width: 520px) { .stats { grid-template-columns: repeat(4, 1fr); } }
+.seg label.inv-opt:has(input:checked) { border-color: var(--inv); color: var(--inv); }
+.field-label { font-size: .85rem; color: var(--muted); margin: 0 0 4px; }
+.seg.filter { margin: 16px 0 0; }
+.seg.filter label { padding: 6px; font-size: .85rem; }
+#budget-form select { margin: 0; flex: 1; min-width: 0; }
+#budget-form input { width: 110px; flex: none; }
