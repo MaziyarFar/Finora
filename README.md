@@ -21,3 +21,7 @@ A tiny personal budget app: budgets, income, expenses, weekly/monthly recurring 
    - Expiration: e.g. 1 year (you'll then create a new one and paste it in Settings)
 4. Open the app, choose a passphrase, then go to **Settings → Sync** and enter `your-name/finora-data` and the token.
 5. On your iPhone, open the same URL in Safari, enter the **same passphrase**, and the same repo and token. Use **Share → Add to Home Screen** for an app-like icon.
+
+## Releasing
+
+GitHub Pages lets browsers cache files for up to 10 minutes. When `app.js` or `style.css` changes, bump the `?v=` number on both in `index.html` so browsers fetch the new files together.
