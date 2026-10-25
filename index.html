@@ -12,9 +12,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 <title>Finora</title>
-<script src="app.js?v=8" defer></script>
+<script src="app.js?v=9" defer></script>
 </head>
 <body>
 <noscript>Finora needs JavaScript.</noscript>
@@ -73,7 +73,7 @@
   </section>
 
   <section id="view-add" class="view" hidden>
-    <h2>Add entry</h2>
+    <h2 id="add-title">Add entry</h2>
     <form id="add-form" class="card" autocomplete="off">
       <div class="seg">
         <label><input type="radio" name="kind" value="expense" checked> Expense</label>
@@ -97,7 +97,12 @@
         </select>
       </label>
       <label>Date <input name="date" type="date" required></label>
-      <button type="submit">Save</button>
+      <p id="edit-hint" class="muted" hidden>This entry repeats. Changes apply to every month it appears in.</p>
+      <button type="submit" id="add-save">Save</button>
+      <div id="edit-actions" class="edit-actions" hidden>
+        <button type="button" id="edit-cancel" class="ghost">Cancel</button>
+        <button type="button" id="edit-delete" class="ghost danger">Delete</button>
+      </div>
       <p id="add-msg" class="muted" role="status"></p>
     </form>
   </section>

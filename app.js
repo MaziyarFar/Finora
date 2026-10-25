@@ -71,7 +71,7 @@
   // ---------- state ----------
   // S.data.items: { [id]: item }, each item has id, type, updatedAt and may be
   // a tombstone ({deleted:true}) so deletes sync across devices.
-  const S = { key: null, salt: null, iter: KDF_ITER, pass: null, data: null, cfg: null, month: null, day: null, person: null, open: new Set(), syncing: false, again: false };
+  const S = { key: null, salt: null, iter: KDF_ITER, pass: null, data: null, cfg: null, month: null, day: null, person: null, editId: null, open: new Set(), syncing: false, again: false };
 
   const emptyData = () => ({ v: 1, currency: 'EUR', currencyAt: 0, items: {} });
   const uid = () => b64(crypto.getRandomValues(new Uint8Array(12))).replace(/[+/=]/g, (c) => ({ '+': '-', '/': '_', '=': '' }[c]));
@@ -283,19 +283,19 @@
     const shown = S.day ? entries.filter((e) => e.date === S.day) : entries;
     $('tx-title').textContent = S.day ? 'Transactions · ' + dayLabel(S.day) : 'Transactions';
     $('day-actions').hidden = !S.day;
-    $('tx-list').replaceChildren(...(shown.length ? shown.map((e) => el('li', { class: 'row-between' },
+    $('tx-list').replaceChildren(...(shown.length ? shown.map((e) => el('li', entryRow(e.id),
       el('div', {}, el('div', { text: (e.sub || e.category) + (e.recurring ? ' ↻' : '') }), el('small', { class: 'muted', text: details(e, e.date) })),
       el('div', { class: 'right' },
         el('b', { class: KIND_CLASS[e.kind], text: (e.kind === 'income' ? '+' : '−') + money(e.amount) }),
-        e.recurring ? '' : el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: () => confirm('Delete this entry?') && remove(e.id) }))))
+        e.recurring ? '' : el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: (ev) => { ev.stopPropagation(); if (confirm('Delete this entry?')) remove(e.id); } }))))
       : [empty(S.day ? 'Nothing on this day.' : 'Nothing this month.')]));
 
-    $('rec-list').replaceChildren(...(live('rec').length ? live('rec').sort((a, b) => a.category.localeCompare(b.category)).map((r) => el('li', { class: 'row-between' },
+    $('rec-list').replaceChildren(...(live('rec').length ? live('rec').sort((a, b) => a.category.localeCompare(b.category)).map((r) => el('li', entryRow(r.id),
       el('div', {}, el('div', { text: `${r.sub || r.category} · ${r.freq}` }), el('small', { class: 'muted', text: details(r, `from ${r.date}` + (r.end ? ` to ${r.end}` : '')) })),
       el('div', { class: 'right' },
         el('b', { class: KIND_CLASS[r.kind], text: money(r.amount) }),
-        r.end ? '' : el('button', { class: 'link', text: 'Stop', onclick: () => { if (confirm('Stop from today? Past months keep it.')) put({ ...r, end: today() }); } }),
-        el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: () => confirm('Delete everywhere, including past months?') && remove(r.id) }))))
+        r.end ? '' : el('button', { class: 'link', text: 'Stop', onclick: (ev) => { ev.stopPropagation(); if (confirm('Stop from today? Past months keep it.')) put({ ...r, end: today() }); } }),
+        el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: (ev) => { ev.stopPropagation(); if (confirm('Delete everywhere, including past months?')) remove(r.id); } }))))
       : [empty('No recurring items. Add one and pick "Every week" or "Every month".')]));
 
     $('budget-list').replaceChildren(...budgets.map((b) => el('li', { class: 'row-between' },
@@ -305,6 +305,41 @@
     $('currency-form').currency.value = S.data.currency;
     $('sync-form').repo.value = S.cfg.repo || '';
     if (!S.syncing) status(S.cfg.token ? (S.cfg.lastSync ? 'Last synced ' + new Date(S.cfg.lastSync).toLocaleString() : 'Not synced yet') : 'Sync is off. Only this device has your data.');
+  }
+
+  // A tappable list row that opens the entry (or its repeating rule) for editing.
+  const entryRow = (id) => ({ class: 'row-between entry', tabindex: '0', role: 'button', 'aria-label': 'Edit entry',
+    onclick: () => startEdit(id),
+    onkeydown: (ev) => { if (ev.target === ev.currentTarget && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); startEdit(id); } } });
+
+  const showView = (name) => document.querySelector(`.tabs [data-view=${name}]`).click();
+
+  function setEditMode(id) {
+    S.editId = id;
+    const item = id && S.data.items[id];
+    $('add-title').textContent = id ? 'Edit entry' : 'Add entry';
+    $('add-save').textContent = id ? 'Save changes' : 'Save';
+    $('edit-actions').hidden = !id;
+    $('edit-hint').hidden = !(item && item.type === 'rec');
+  }
+
+  function startEdit(id) {
+    const item = S.data.items[id];
+    if (!item || item.deleted) return;
+    showView('add'); // resets the form first
+    const f = $('add-form');
+    f.kind.value = Object.hasOwn(CATEGORIES, item.kind) ? item.kind : 'expense';
+    syncAddSelects();
+    f.category.value = item.category;
+    syncAddSelects();
+    if (item.sub) f.sub.value = item.sub;
+    f.person.value = PEOPLE.includes(item.person) ? item.person : 'A';
+    f.amount.value = (item.amount / 100).toFixed(2);
+    f.note.value = item.note || '';
+    f.freq.value = item.type === 'rec' ? item.freq : 'once';
+    f.date.value = item.date;
+    setEditMode(id);
+    f.amount.focus();
   }
 
   const KIND_CLASS = { income: 'pos', expense: 'neg', invest: 'inv' };
@@ -490,6 +525,13 @@
       document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
       document.querySelectorAll('.view').forEach((v) => { v.hidden = v.id !== 'view-' + b.dataset.view; });
       $('add-msg').textContent = '';
+      if (S.editId) { // leaving or re-entering Add drops an unfinished edit
+        setEditMode(null);
+        const f = $('add-form');
+        f.amount.value = f.note.value = '';
+        f.freq.value = 'once';
+        f.date.value = today();
+      }
     }));
     const shift = (n) => {
       const [y, m] = S.month.split('-').map(Number);
@@ -521,11 +563,22 @@
       const sub = subs?.length ? f.sub.value : null;
       const person = PEOPLE.includes(f.person.value) ? f.person.value : null;
       if (amount === null || !subs || (subs.length && !subs.includes(sub)) || !person || !isDate(f.date.value)) { toast('Check amount, category and date.'); return; }
-      const base = { id: uid(), kind, amount, category, sub, person, note: clean(f.note.value, 100), date: f.date.value };
+      const old = S.editId && S.data.items[S.editId];
+      const base = { id: old ? old.id : uid(), kind, amount, category, sub, person, note: clean(f.note.value, 100), date: f.date.value };
       if (f.freq.value === 'once') put({ ...base, type: 'tx' });
-      else put({ ...base, type: 'rec', freq: f.freq.value === 'weekly' ? 'weekly' : 'monthly', end: null });
+      else put({ ...base, type: 'rec', freq: f.freq.value === 'weekly' ? 'weekly' : 'monthly', end: old?.type === 'rec' ? old.end : null });
+      if (old) { showView('month'); return; }
       f.amount.value = f.note.value = '';
       toast('Saved.');
+    });
+
+    $('edit-cancel').addEventListener('click', () => showView('month'));
+    $('edit-delete').addEventListener('click', () => {
+      const item = S.data.items[S.editId];
+      if (!item) return;
+      if (!confirm(item.type === 'rec' ? 'Delete everywhere, including past months?' : 'Delete this entry?')) return;
+      remove(item.id);
+      showView('month');
     });
 
     $('budget-form').addEventListener('submit', (e) => {

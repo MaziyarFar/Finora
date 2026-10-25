@@ -94,3 +94,10 @@ progress.over::-moz-progress-bar { background: var(--neg); }
 .chart .subs li { padding: 6px 0; }
 .chart .subs .bar-track { height: 5px; margin-top: 4px; }
 .chart .chart-total { padding: 12px 14px; }
+
+.list li.entry { cursor: pointer; }
+.list li.entry:hover { background: color-mix(in srgb, var(--line) 35%, transparent); }
+.list li.entry:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.edit-actions { display: flex; gap: 8px; margin-top: 8px; }
+.edit-actions button { flex: 1; background: var(--card); color: var(--fg); border: 1px solid var(--line); }
+.edit-actions button.danger { color: var(--neg); }
