@@ -82,3 +82,14 @@ progress.over::-moz-progress-bar { background: var(--neg); }
 .seg.filter label { padding: 6px; font-size: .85rem; }
 #budget-form select { margin: 0; flex: 1; min-width: 0; }
 #budget-form input { width: 110px; flex: none; }
+
+.chart > li { padding: 0; }
+.chart .chart-row { display: block; width: 100%; text-align: left; background: none; color: var(--fg); border-radius: 0; padding: 12px 14px; }
+.chart .right small { margin-left: 6px; min-width: 2.6em; text-align: right; }
+.bar-track { height: 8px; margin-top: 8px; }
+.bar-fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.bar-fill.sub { opacity: .55; }
+.chart .subs { list-style: none; margin: 0; padding: 0 14px 12px 30px; font-size: .9rem; }
+.chart .subs li { padding: 6px 0; }
+.chart .subs .bar-track { height: 5px; margin-top: 4px; }
+.chart .chart-total { padding: 12px 14px; }
