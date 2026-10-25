@@ -55,7 +55,7 @@
   // ---------- state ----------
   // S.data.items: { [id]: item }, each item has id, type, updatedAt and may be
   // a tombstone ({deleted:true}) so deletes sync across devices.
-  const S = { key: null, salt: null, iter: KDF_ITER, pass: null, data: null, cfg: null, month: null, syncing: false, again: false };
+  const S = { key: null, salt: null, iter: KDF_ITER, pass: null, data: null, cfg: null, month: null, day: null, syncing: false, again: false };
 
   const emptyData = () => ({ v: 1, currency: 'EUR', currencyAt: 0, items: {} });
   const uid = () => b64(crypto.getRandomValues(new Uint8Array(12))).replace(/[+/=]/g, (c) => ({ '+': '-', '/': '_', '=': '' }[c]));
@@ -246,6 +246,8 @@
     $('sum-net').textContent = money(inn - out);
     $('sum-net').className = inn - out < 0 ? 'neg' : 'pos';
 
+    renderCalendar(month, entries);
+
     const spent = new Map();
     for (const e of entries) if (e.kind === 'expense') spent.set(e.category, (spent.get(e.category) || 0) + e.amount);
     const budgets = live('budget').sort((a, b) => a.category.localeCompare(b.category));
@@ -257,12 +259,15 @@
         el('progress', { max: '100', value: String(pct), class: s > b.amount ? 'over' : '' }));
     }) : [empty('No budgets yet. Add them in Budgets.')]));
 
-    $('tx-list').replaceChildren(...(entries.length ? entries.map((e) => el('li', { class: 'row-between' },
+    const shown = S.day ? entries.filter((e) => e.date === S.day) : entries;
+    $('tx-title').textContent = S.day ? 'Transactions · ' + dayLabel(S.day) : 'Transactions';
+    $('day-actions').hidden = !S.day;
+    $('tx-list').replaceChildren(...(shown.length ? shown.map((e) => el('li', { class: 'row-between' },
       el('div', {}, el('div', { text: e.category + (e.recurring ? ' ↻' : '') }), el('small', { class: 'muted', text: e.date + (e.note ? ' · ' + e.note : '') })),
       el('div', { class: 'right' },
         el('b', { class: e.kind === 'income' ? 'pos' : 'neg', text: (e.kind === 'income' ? '+' : '−') + money(e.amount) }),
         e.recurring ? '' : el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: () => confirm('Delete this entry?') && remove(e.id) }))))
-      : [empty('Nothing this month.')]));
+      : [empty(S.day ? 'Nothing on this day.' : 'Nothing this month.')]));
 
     $('rec-list').replaceChildren(...(live('rec').length ? live('rec').sort((a, b) => a.category.localeCompare(b.category)).map((r) => el('li', { class: 'row-between' },
       el('div', {}, el('div', { text: `${r.category} · ${r.freq}` }), el('small', { class: 'muted', text: `from ${r.date}` + (r.end ? ` to ${r.end}` : '') + (r.note ? ' · ' + r.note : '') })),
@@ -281,6 +286,42 @@
     $('currency-form').currency.value = S.data.currency;
     $('sync-form').repo.value = S.cfg.repo || '';
     if (!S.syncing) status(S.cfg.token ? (S.cfg.lastSync ? 'Last synced ' + new Date(S.cfg.lastSync).toLocaleString() : 'Not synced yet') : 'Sync is off. Only this device has your data.');
+  }
+
+  const dayLabel = (d) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  // Whole-unit amounts so they fit a phone-width cell, e.g. 3000 or 1.2K.
+  const short = (c) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(c / 100);
+
+  // Month grid, weeks start on Monday. Each day shows its total in and out.
+  function renderCalendar(month, entries) {
+    const [y, m] = month.split('-').map(Number);
+    const per = new Map();
+    for (const e of entries) {
+      const t = per.get(e.date) || { in: 0, out: 0 };
+      if (e.kind === 'income') t.in += e.amount; else t.out += e.amount;
+      per.set(e.date, t);
+    }
+    const cells = [];
+    const monday = new Date(2024, 0, 1); // a Monday, used for weekday names
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday); d.setDate(1 + i);
+      cells.push(el('div', { class: 'wd', text: d.toLocaleDateString(undefined, { weekday: 'narrow' }) }));
+    }
+    const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+    for (let i = 0; i < lead; i++) cells.push(el('div', { class: 'pad' }));
+    const now = today();
+    for (let d = 1; d <= daysIn(y, m); d++) {
+      const date = `${month}-${String(d).padStart(2, '0')}`;
+      const t = per.get(date);
+      const cls = ['day', date === now ? 'today' : '', date === S.day ? 'sel' : ''].join(' ').trim();
+      const label = dayLabel(date) + (t ? `: in ${money(t.in)}, out ${money(t.out)}` : '');
+      cells.push(el('button', { class: cls, 'aria-label': label, 'aria-pressed': String(date === S.day),
+        onclick: () => { S.day = S.day === date ? null : date; render(); } },
+        el('span', { class: 'dn', text: String(d) }),
+        t?.in ? el('span', { class: 'pos', text: '+' + short(t.in) }) : '',
+        t?.out ? el('span', { class: 'neg', text: '−' + short(t.out) }) : ''));
+    }
+    $('cal').replaceChildren(...cells);
   }
 
   const status = (t) => { $('sync-status').textContent = t; };
@@ -369,8 +410,14 @@
       const [y, m] = S.month.split('-').map(Number);
       const d = new Date(y, m - 1 + n, 1);
       S.month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      S.day = null;
       render();
     };
+    $('day-clear').addEventListener('click', () => { S.day = null; render(); });
+    $('day-add').addEventListener('click', () => {
+      $('add-form').date.value = S.day;
+      document.querySelector('.tabs [data-view=add]').click();
+    });
     $('prev').addEventListener('click', () => shift(-1));
     $('next').addEventListener('click', () => shift(1));
 

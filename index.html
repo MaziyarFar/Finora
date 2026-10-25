@@ -47,9 +47,16 @@
       <div class="stat"><span>Out</span><b id="sum-out" class="neg"></b></div>
       <div class="stat"><span>Left</span><b id="sum-net"></b></div>
     </div>
+    <div id="cal" class="cal" role="grid" aria-label="Calendar"></div>
     <h2>Budgets</h2>
     <ul id="budget-progress" class="list"></ul>
-    <h2>Transactions</h2>
+    <div class="row-between">
+      <h2 id="tx-title">Transactions</h2>
+      <div id="day-actions" hidden>
+        <button id="day-add" class="link">+ Add</button>
+        <button id="day-clear" class="link">Show all</button>
+      </div>
+    </div>
     <ul id="tx-list" class="list"></ul>
   </section>
 
