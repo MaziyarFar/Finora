@@ -16,7 +16,13 @@
   const $ = (id) => document.getElementById(id);
 
   // ---------- crypto ----------
-  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  // Chunked so large vaults don't exceed the engine's argument limit.
+  const b64 = (buf) => {
+    const a = new Uint8Array(buf);
+    let s = '';
+    for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode(...a.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
   const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
   async function deriveKey(pass, salt, iter) {
@@ -49,7 +55,7 @@
   // ---------- state ----------
   // S.data.items: { [id]: item }, each item has id, type, updatedAt and may be
   // a tombstone ({deleted:true}) so deletes sync across devices.
-  const S = { key: null, salt: null, iter: KDF_ITER, pass: null, data: null, cfg: null, month: null, syncing: false };
+  const S = { key: null, salt: null, iter: KDF_ITER, pass: null, data: null, cfg: null, month: null, syncing: false, again: false };
 
   const emptyData = () => ({ v: 1, currency: 'EUR', currencyAt: 0, items: {} });
   const uid = () => b64(crypto.getRandomValues(new Uint8Array(12))).replace(/[+/=]/g, (c) => ({ '+': '-', '/': '_', '=': '' }[c]));
@@ -85,7 +91,7 @@
   const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z'));
 
   function validItem(i) {
-    if (!i || typeof i !== 'object' || typeof i.id !== 'string' || i.id.length > 40) return false;
+    if (!i || typeof i !== 'object' || typeof i.id !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(i.id)) return false;
     if (!Number.isFinite(i.updatedAt)) return false;
     if (i.deleted) return true;
     if (!Number.isInteger(i.amount) || i.amount < 0 || i.amount > 1e11) return false;
@@ -144,7 +150,8 @@
   }
 
   async function sync() {
-    if (!S.cfg?.token || !S.cfg?.repo || S.syncing) return;
+    if (!S.cfg?.token || !S.cfg?.repo) return;
+    if (S.syncing) { S.again = true; return; } // run once more when the current sync ends
     S.syncing = true;
     status('Syncing…');
     try {
@@ -179,6 +186,7 @@
       status('Sync failed: ' + (e.name === 'OperationError' ? 'remote data uses a different passphrase' : e.message));
     } finally {
       S.syncing = false;
+      if (S.again) { S.again = false; sync(); }
     }
   }
 
@@ -238,11 +246,11 @@
     $('sum-net').textContent = money(inn - out);
     $('sum-net').className = inn - out < 0 ? 'neg' : 'pos';
 
-    const spent = {};
-    for (const e of entries) if (e.kind === 'expense') spent[e.category] = (spent[e.category] || 0) + e.amount;
+    const spent = new Map();
+    for (const e of entries) if (e.kind === 'expense') spent.set(e.category, (spent.get(e.category) || 0) + e.amount);
     const budgets = live('budget').sort((a, b) => a.category.localeCompare(b.category));
     $('budget-progress').replaceChildren(...(budgets.length ? budgets.map((b) => {
-      const s = spent[b.category] || 0;
+      const s = spent.get(b.category) || 0;
       const pct = b.amount ? Math.min(100, Math.round((s / b.amount) * 100)) : 100;
       return el('li', { class: 'budget' },
         el('div', { class: 'row-between' }, el('span', { text: b.category }), el('span', { class: s > b.amount ? 'neg' : '', text: `${money(s)} / ${money(b.amount)}` })),
