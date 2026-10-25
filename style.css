@@ -1,0 +1,65 @@
+:root {
+  --bg: #f6f6f4; --card: #fff; --fg: #1d1d1f; --muted: #6e6e73; --line: #e3e3e0;
+  --accent: #2f6f5e; --pos: #1f7a4d; --neg: #b3261e;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111113; --card: #1c1c1f; --fg: #ececee; --muted: #9a9aa0; --line: #2c2c30;
+    --accent: #5fb39a; --pos: #5fc28a; --neg: #ff7a70; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  padding: env(safe-area-inset-top) 0 calc(64px + env(safe-area-inset-bottom)); -webkit-text-size-adjust: 100%; }
+[hidden] { display: none !important; }
+h1 { font-size: 1.2rem; margin: 0; font-weight: 600; }
+h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; font-weight: 600; }
+small { font-size: .8rem; }
+.muted { color: var(--muted); }
+.err { color: var(--neg); min-height: 1.4em; }
+.pos { color: var(--pos); } .neg { color: var(--neg); }
+.screen, .view { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+.screen { padding-top: 15vh; }
+.screen h1 { font-size: 1.8rem; margin-bottom: 8px; }
+label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 12px; }
+input, select, button { font: inherit; font-size: 16px; }
+input, select { display: block; width: 100%; margin-top: 4px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--card); color: var(--fg); }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+button { padding: 10px 16px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer; }
+button:disabled { opacity: .6; }
+.view > button { display: block; width: 100%; margin-bottom: 8px; background: var(--card); color: var(--fg); border: 1px solid var(--line); }
+.view > button.danger { color: var(--neg); }
+button.link { background: none; color: var(--muted); padding: 4px 8px; }
+button.icon { background: none; color: var(--fg); font-size: 1.6rem; padding: 0 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.card button[type=submit] { width: 100%; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row input { margin: 0; }
+.row button[type=submit] { width: auto; }
+.seg { display: flex; gap: 8px; margin-bottom: 12px; }
+.seg label { flex: 1; margin: 0; text-align: center; border: 1px solid var(--line); border-radius: 10px; padding: 10px; color: var(--fg); }
+.seg label { position: relative; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); }
+.seg label:has(input:checked) { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.bar { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 4px; background: var(--bg); border-bottom: 1px solid var(--line); z-index: 1; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.stat span { display: block; font-size: .8rem; color: var(--muted); }
+.stat b { font-size: 1.05rem; font-variant-numeric: tabular-nums; word-break: break-word; }
+.list { list-style: none; margin: 0; padding: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.list li { padding: 12px 14px; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.row-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.right { display: flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.budget progress { width: 100%; height: 6px; margin-top: 8px; appearance: none; border: 0; border-radius: 3px; background: var(--line); overflow: hidden; }
+progress::-webkit-progress-bar { background: var(--line); }
+progress::-webkit-progress-value { background: var(--accent); }
+progress::-moz-progress-bar { background: var(--accent); }
+progress.over::-webkit-progress-value { background: var(--neg); }
+progress.over::-moz-progress-bar { background: var(--neg); }
+.tabs { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: var(--card); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom); }
+.tabs button { flex: 1; background: none; color: var(--muted); border-radius: 0; padding: 14px 2px; font-size: .8rem; }
+.tabs button.on { color: var(--accent); font-weight: 600; }

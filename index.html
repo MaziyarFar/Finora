@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; connect-src https://api.github.com; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Finora">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
+<title>Finora</title>
+<script src="app.js" defer></script>
+</head>
+<body>
+<noscript>Finora needs JavaScript.</noscript>
+
+<main id="lock" class="screen" hidden>
+  <h1>Finora</h1>
+  <p id="lock-hint" class="muted"></p>
+  <form id="lock-form" autocomplete="off">
+    <label>Passphrase
+      <input id="pass" type="password" autocomplete="current-password" required minlength="12" maxlength="256">
+    </label>
+    <label id="pass2-wrap" hidden>Repeat passphrase
+      <input id="pass2" type="password" autocomplete="new-password" minlength="12" maxlength="256">
+    </label>
+    <button type="submit" id="lock-btn">Unlock</button>
+    <p id="lock-err" class="err" role="alert"></p>
+  </form>
+</main>
+
+<div id="app" hidden>
+  <header class="bar">
+    <button id="prev" class="icon" aria-label="Previous month">‹</button>
+    <h1 id="month-title"></h1>
+    <button id="next" class="icon" aria-label="Next month">›</button>
+  </header>
+
+  <section id="view-month" class="view">
+    <div class="stats">
+      <div class="stat"><span>In</span><b id="sum-in" class="pos"></b></div>
+      <div class="stat"><span>Out</span><b id="sum-out" class="neg"></b></div>
+      <div class="stat"><span>Left</span><b id="sum-net"></b></div>
+    </div>
+    <h2>Budgets</h2>
+    <ul id="budget-progress" class="list"></ul>
+    <h2>Transactions</h2>
+    <ul id="tx-list" class="list"></ul>
+  </section>
+
+  <section id="view-add" class="view" hidden>
+    <h2>Add entry</h2>
+    <form id="add-form" class="card" autocomplete="off">
+      <div class="seg">
+        <label><input type="radio" name="kind" value="expense" checked> Expense</label>
+        <label><input type="radio" name="kind" value="income"> Income</label>
+      </div>
+      <label>Amount <input name="amount" inputmode="decimal" required pattern="[0-9]+([.,][0-9]{1,2})?" maxlength="12"></label>
+      <label>Category <input name="category" list="cats" required maxlength="40"></label>
+      <label>Note <input name="note" maxlength="100"></label>
+      <label>Repeats
+        <select name="freq">
+          <option value="once">No, one time</option>
+          <option value="weekly">Every week</option>
+          <option value="monthly">Every month</option>
+        </select>
+      </label>
+      <label>Date <input name="date" type="date" required></label>
+      <button type="submit">Save</button>
+      <p id="add-msg" class="muted" role="status"></p>
+    </form>
+    <datalist id="cats"></datalist>
+  </section>
+
+  <section id="view-recurring" class="view" hidden>
+    <h2>Recurring</h2>
+    <ul id="rec-list" class="list"></ul>
+  </section>
+
+  <section id="view-budgets" class="view" hidden>
+    <h2>Monthly budgets</h2>
+    <form id="budget-form" class="card row" autocomplete="off">
+      <input name="category" list="cats" placeholder="Category" required maxlength="40">
+      <input name="amount" inputmode="decimal" placeholder="Amount" required pattern="[0-9]+([.,][0-9]{1,2})?" maxlength="12">
+      <button type="submit">Set</button>
+    </form>
+    <ul id="budget-list" class="list"></ul>
+  </section>
+
+  <section id="view-settings" class="view" hidden>
+    <h2>Sync</h2>
+    <p id="sync-status" class="muted"></p>
+    <form id="sync-form" class="card" autocomplete="off">
+      <label>Data repository (owner/name) <input name="repo" placeholder="you/finora-data" required maxlength="140"></label>
+      <label>GitHub token <input name="token" type="password" autocomplete="off" placeholder="leave empty to keep current" maxlength="255"></label>
+      <button type="submit">Save and sync</button>
+    </form>
+    <button id="sync-now">Sync now</button>
+    <h2>Settings</h2>
+    <form id="currency-form" class="card row" autocomplete="off">
+      <input name="currency" placeholder="EUR" required pattern="[A-Z]{3}" maxlength="3">
+      <button type="submit">Set currency</button>
+    </form>
+    <button id="export">Export data (unencrypted JSON)</button>
+    <button id="lock-now">Lock</button>
+    <button id="wipe" class="danger">Remove data from this device</button>
+  </section>
+
+  <nav class="tabs">
+    <button data-view="month" class="on">Month</button>
+    <button data-view="add">Add</button>
+    <button data-view="recurring">Recurring</button>
+    <button data-view="budgets">Budgets</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+</div>
+</body>
+</html>
