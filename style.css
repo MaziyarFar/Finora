@@ -101,3 +101,8 @@ progress.over::-moz-progress-bar { background: var(--neg); }
 .edit-actions { display: flex; gap: 8px; margin-top: 8px; }
 .edit-actions button { flex: 1; background: var(--card); color: var(--fg); border: 1px solid var(--line); }
 .edit-actions button.danger { color: var(--neg); }
+
+.small { font-size: .85rem; margin: 0 0 4px; }
+label small { color: var(--muted); font-size: .75rem; }
+#rec-groups h2 { margin-top: 16px; }
+#rec-groups .list + h2 { margin-top: 24px; }

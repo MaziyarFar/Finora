@@ -12,9 +12,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 <title>Finora</title>
-<script src="app.js?v=9" defer></script>
+<script src="app.js?v=10" defer></script>
 </head>
 <body>
 <noscript>Finora needs JavaScript.</noscript>
@@ -96,7 +96,8 @@
           <option value="monthly">Every month</option>
         </select>
       </label>
-      <label>Date <input name="date" type="date" required></label>
+      <label><span id="date-label">Date</span> <input name="date" type="date" required></label>
+      <label id="end-wrap" hidden>Ends <small>(leave empty if it has no end)</small> <input name="end" type="date"></label>
       <p id="edit-hint" class="muted" hidden>This entry repeats. Changes apply to every month it appears in.</p>
       <button type="submit" id="add-save">Save</button>
       <div id="edit-actions" class="edit-actions" hidden>
@@ -108,8 +109,12 @@
   </section>
 
   <section id="view-recurring" class="view" hidden>
-    <h2>Recurring</h2>
-    <ul id="rec-list" class="list"></ul>
+    <div class="row-between">
+      <h2>Repeating payments</h2>
+      <button id="rec-add" class="link">+ Add</button>
+    </div>
+    <p class="muted small">Weekly and monthly entries, with when they start and end. Tap one to edit it.</p>
+    <div id="rec-groups"></div>
   </section>
 
   <section id="view-budgets" class="view" hidden>

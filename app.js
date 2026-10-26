@@ -290,13 +290,7 @@
         e.recurring ? '' : el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: (ev) => { ev.stopPropagation(); if (confirm('Delete this entry?')) remove(e.id); } }))))
       : [empty(S.day ? 'Nothing on this day.' : 'Nothing this month.')]));
 
-    $('rec-list').replaceChildren(...(live('rec').length ? live('rec').sort((a, b) => a.category.localeCompare(b.category)).map((r) => el('li', entryRow(r.id),
-      el('div', {}, el('div', { text: `${r.sub || r.category} · ${r.freq}` }), el('small', { class: 'muted', text: details(r, `from ${r.date}` + (r.end ? ` to ${r.end}` : '')) })),
-      el('div', { class: 'right' },
-        el('b', { class: KIND_CLASS[r.kind], text: money(r.amount) }),
-        r.end ? '' : el('button', { class: 'link', text: 'Stop', onclick: (ev) => { ev.stopPropagation(); if (confirm('Stop from today? Past months keep it.')) put({ ...r, end: today() }); } }),
-        el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: (ev) => { ev.stopPropagation(); if (confirm('Delete everywhere, including past months?')) remove(r.id); } }))))
-      : [empty('No recurring items. Add one and pick "Every week" or "Every month".')]));
+    renderRecurring();
 
     $('budget-list').replaceChildren(...budgets.map((b) => el('li', { class: 'row-between' },
       el('span', { text: b.category }),
@@ -338,8 +332,37 @@
     f.note.value = item.note || '';
     f.freq.value = item.type === 'rec' ? item.freq : 'once';
     f.date.value = item.date;
+    f.end.value = item.type === 'rec' && item.end ? item.end : '';
+    syncRepeatFields();
     setEditMode(id);
     f.amount.focus();
+  }
+
+  // Repeating payments grouped by whether they are running now, start later, or have ended.
+  function renderRecurring() {
+    const now = today();
+    const groups = { Active: [], Upcoming: [], Ended: [] };
+    for (const r of live('rec')) groups[r.end && r.end < now ? 'Ended' : r.date > now ? 'Upcoming' : 'Active'].push(r);
+    const range = (r) => `${dayLabel(r.date, true)} → ${r.end ? dayLabel(r.end, true) : 'no end'}`;
+    const row = (r) => el('li', entryRow(r.id),
+      el('div', {}, el('div', { text: `${r.sub || r.category} · ${r.freq}` }), el('small', { class: 'muted', text: details(r, range(r)) })),
+      el('div', { class: 'right' },
+        el('b', { class: KIND_CLASS[r.kind], text: money(r.amount) }),
+        r.end && r.end < now ? '' : el('button', { class: 'link', text: 'Stop', onclick: (ev) => { ev.stopPropagation(); if (confirm('End it today? Past months keep it.')) put({ ...r, end: now }); } }),
+        el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: (ev) => { ev.stopPropagation(); if (confirm('Delete everywhere, including past months?')) remove(r.id); } })));
+    const sorted = (list) => list.sort((a, b) => a.category.localeCompare(b.category) || a.date.localeCompare(b.date));
+    const parts = Object.entries(groups).filter(([, list]) => list.length)
+      .flatMap(([name, list]) => [el('h2', { text: `${name} (${list.length})` }), el('ul', { class: 'list' }, ...sorted(list).map(row))]);
+    $('rec-groups').replaceChildren(...(parts.length ? parts : [el('ul', { class: 'list' }, empty('No repeating payments yet. Tap + Add and choose "Every week" or "Every month".'))]));
+  }
+
+  // Shows the end date field only for repeating entries.
+  function syncRepeatFields() {
+    const f = $('add-form');
+    const repeats = f.freq.value !== 'once';
+    $('end-wrap').hidden = !repeats;
+    $('date-label').textContent = repeats ? 'Starts' : 'Date';
+    if (!repeats) f.end.value = '';
   }
 
   const KIND_CLASS = { income: 'pos', expense: 'neg', invest: 'inv' };
@@ -360,7 +383,7 @@
     $('sub-wrap').hidden = !subs.length;
   }
 
-  const dayLabel = (d) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const dayLabel = (d, year) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) });
   // Whole-unit amounts so they fit a phone-width cell, e.g. 3000 or 1.2K.
   const short = (c) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(c / 100);
 
@@ -531,6 +554,8 @@
         f.amount.value = f.note.value = '';
         f.freq.value = 'once';
         f.date.value = today();
+        f.end.value = '';
+        syncRepeatFields();
       }
     }));
     const shift = (n) => {
@@ -546,7 +571,15 @@
       document.querySelector('.tabs [data-view=add]').click();
     });
     $('prev').addEventListener('click', () => shift(-1));
-    $('add-form').addEventListener('change', (e) => { if (['kind', 'category'].includes(e.target.name)) syncAddSelects(); });
+    $('add-form').addEventListener('change', (e) => {
+      if (['kind', 'category'].includes(e.target.name)) syncAddSelects();
+      if (e.target.name === 'freq') syncRepeatFields();
+    });
+    $('rec-add').addEventListener('click', () => {
+      showView('add');
+      $('add-form').freq.value = 'monthly';
+      syncRepeatFields();
+    });
     syncAddSelects();
     fillSelect($('budget-form').category, Object.keys(EXPENSES));
     $('person-filter').addEventListener('change', (e) => { S.person = PEOPLE.includes(e.target.value) ? e.target.value : null; render(); });
@@ -563,12 +596,14 @@
       const sub = subs?.length ? f.sub.value : null;
       const person = PEOPLE.includes(f.person.value) ? f.person.value : null;
       if (amount === null || !subs || (subs.length && !subs.includes(sub)) || !person || !isDate(f.date.value)) { toast('Check amount, category and date.'); return; }
+      const end = f.freq.value === 'once' ? null : f.end.value || null;
+      if (end && (!isDate(end) || end < f.date.value)) { toast('The end date must be on or after the start date.'); return; }
       const old = S.editId && S.data.items[S.editId];
       const base = { id: old ? old.id : uid(), kind, amount, category, sub, person, note: clean(f.note.value, 100), date: f.date.value };
       if (f.freq.value === 'once') put({ ...base, type: 'tx' });
-      else put({ ...base, type: 'rec', freq: f.freq.value === 'weekly' ? 'weekly' : 'monthly', end: old?.type === 'rec' ? old.end : null });
+      else put({ ...base, type: 'rec', freq: f.freq.value === 'weekly' ? 'weekly' : 'monthly', end });
       if (old) { showView('month'); return; }
-      f.amount.value = f.note.value = '';
+      f.amount.value = f.note.value = f.end.value = '';
       toast('Saved.');
     });
 
