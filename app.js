@@ -26,8 +26,9 @@
     'Loans & Debt': ['Bank Loan Repayments'],
     'Bank': ['Bank Account Fee'],
   };
+  // opening: money a person already had at the start of the month (counts toward Left, not as income).
   // save: cash taken out of the balance. move: money passed from one person's balance to the other's.
-  const CATEGORIES = { expense: EXPENSES, income: { 'Salary': [] }, invest: { 'Investment': [] }, save: { 'Cash': [] }, move: { 'Transfer': [] } };
+  const CATEGORIES = { expense: EXPENSES, income: { 'Salary': [] }, invest: { 'Investment': [] }, save: { 'Cash': [] }, move: { 'Transfer': [] }, opening: { 'Opening balance': [] } };
   const enc = new TextEncoder();
   const dec = new TextDecoder();
   const $ = (id) => document.getElementById(id);
@@ -265,16 +266,16 @@
 
     const entries = monthEntries(month);
     const total = (k) => entries.filter((e) => e.kind === k).reduce((s, e) => s + e.amount, 0);
-    const inn = total('income'), out = total('expense'), inv = total('invest'), saved = total('save');
+    const opening = total('opening'), inn = total('income'), out = total('expense'), inv = total('invest'), saved = total('save');
     // Moves only shift money between people, so they count only when one person is selected.
     const moved = S.person ? entries.filter((e) => e.kind === 'move').reduce((s, e) => s + (e.to === S.person ? e.amount : -e.amount), 0) : 0;
-    const left = inn - out - inv - saved + moved;
+    const left = opening + inn - out - inv - saved + moved;
+    $('sum-open').textContent = money(opening);
     $('sum-in').textContent = money(inn);
     $('sum-out').textContent = money(out);
     $('sum-inv').textContent = money(inv);
     $('sum-save').textContent = money(saved);
-    $('moved-tile').hidden = !S.person;
-    $('sum-move').textContent = (moved > 0 ? '+' : '') + money(moved);
+    $('sum-move').textContent = S.person ? (moved > 0 ? '+' : '') + money(moved) : '—';
     $('sum-net').textContent = money(left);
     $('sum-net').className = left < 0 ? 'neg' : 'pos';
 
@@ -372,16 +373,20 @@
   // Shows the end date field only for repeating entries.
   function syncRepeatFields() {
     const f = $('add-form');
+    // An opening balance happens once, so it never repeats.
+    const once = f.kind.value === 'opening';
+    $('freq-wrap').hidden = once;
+    if (once) f.freq.value = 'once';
     const repeats = f.freq.value !== 'once';
     $('end-wrap').hidden = !repeats;
     $('date-label').textContent = repeats ? 'Starts' : 'Date';
     if (!repeats) f.end.value = '';
   }
 
-  const KIND_CLASS = { income: 'pos', expense: 'neg', invest: 'inv', save: 'save', move: 'move' };
+  const KIND_CLASS = { income: 'pos', expense: 'neg', invest: 'inv', save: 'save', move: 'move', opening: 'open' };
   const entryTitle = (i) => i.kind === 'move' ? `Move ${i.person} → ${i.to}` : i.kind === 'save' ? 'Saved cash' : i.sub || i.category;
   // Money in shows +, money out −. A move is + for the receiver, − for the sender, and unsigned in the All view.
-  const sign = (i) => i.kind === 'income' ? '+' : i.kind !== 'move' ? '−' : !S.person ? '' : i.to === S.person ? '+' : '−';
+  const sign = (i) => i.kind === 'income' || i.kind === 'opening' ? '+' : i.kind !== 'move' ? '−' : !S.person ? '' : i.to === S.person ? '+' : '−';
   // Second line of a list row: main category (when a sub-cost is shown above), when, who, note.
   const details = (i, when) => [i.sub ? i.category : '', when, i.kind === 'move' ? '' : i.person, i.note].filter(Boolean).join(' · ');
 
@@ -414,7 +419,7 @@
     const [y, m] = month.split('-').map(Number);
     const per = new Map();
     for (const e of entries) {
-      if (e.kind === 'move') continue;
+      if (e.kind === 'move' || e.kind === 'opening') continue;
       const t = per.get(e.date) || { in: 0, out: 0, inv: 0, save: 0 };
       if (e.kind === 'income') t.in += e.amount; else if (e.kind === 'invest') t.inv += e.amount; else if (e.kind === 'save') t.save += e.amount; else t.out += e.amount;
       per.set(e.date, t);
@@ -597,6 +602,7 @@
     $('prev').addEventListener('click', () => shift(-1));
     $('add-form').addEventListener('change', (e) => {
       if (['kind', 'category', 'person'].includes(e.target.name)) syncAddSelects();
+      if (e.target.name === 'kind') syncRepeatFields();
       if (e.target.name === 'freq') syncRepeatFields();
     });
     $('rec-add').addEventListener('click', () => {

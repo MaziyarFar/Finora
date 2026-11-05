@@ -12,9 +12,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 <title>Finora</title>
-<script src="app.js?v=11" defer></script>
+<script src="app.js?v=12" defer></script>
 </head>
 <body>
 <noscript>Finora needs JavaScript.</noscript>
@@ -48,12 +48,13 @@
       <label><input type="radio" name="who" value="M"> M</label>
     </div>
     <div class="stats">
+      <div class="stat"><span>Opening balance</span><b id="sum-open" class="open"></b></div>
       <div class="stat"><span>In</span><b id="sum-in" class="pos"></b></div>
       <div class="stat"><span>Out</span><b id="sum-out" class="neg"></b></div>
       <div class="stat"><span>Invested</span><b id="sum-inv" class="inv"></b></div>
       <div class="stat"><span>Saved (cash)</span><b id="sum-save" class="save"></b></div>
-      <div class="stat" id="moved-tile" hidden><span>Moved</span><b id="sum-move" class="move"></b></div>
-      <div class="stat"><span>Left</span><b id="sum-net"></b></div>
+      <div class="stat"><span>Moved</span><b id="sum-move" class="move"></b></div>
+      <div class="stat stat-left"><span>Left</span><b id="sum-net"></b></div>
     </div>
     <div id="cal" class="cal" role="grid" aria-label="Calendar"></div>
     <h2>Income</h2>
@@ -80,6 +81,7 @@
       <div class="seg kinds">
         <label><input type="radio" name="kind" value="expense" checked> Expense</label>
         <label><input type="radio" name="kind" value="income"> Income</label>
+        <label class="open-opt"><input type="radio" name="kind" value="opening"> Opening balance</label>
         <label class="inv-opt"><input type="radio" name="kind" value="invest"> Investment</label>
         <label class="save-opt"><input type="radio" name="kind" value="save"> Save</label>
         <label class="move-opt"><input type="radio" name="kind" value="move"> Move</label>
@@ -100,7 +102,7 @@
       <label id="cat-wrap">Category <select name="category" required></select></label>
       <label id="sub-wrap">Sub-cost <select name="sub"></select></label>
       <label>Note <input name="note" maxlength="100"></label>
-      <label>Repeats
+      <label id="freq-wrap">Repeats
         <select name="freq">
           <option value="once">No, one time</option>
           <option value="weekly">Every week</option>
