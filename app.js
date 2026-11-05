@@ -400,7 +400,8 @@
     const isMove = f.kind.value === 'move';
     $('to-wrap').hidden = !isMove;
     $('cat-wrap').hidden = isMove;
-    // With two people, money always moves to the other one.
+    // "To whom" lists only the other people; the sender is never offered.
+    for (const r of f.querySelectorAll('input[name=to]')) r.closest('label').hidden = r.value === f.person.value;
     if (isMove && f.to.value === f.person.value) f.to.value = PEOPLE.find((p) => p !== f.person.value);
   }
 
