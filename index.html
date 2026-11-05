@@ -12,9 +12,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 <title>Finora</title>
-<script src="app.js?v=10" defer></script>
+<script src="app.js?v=11" defer></script>
 </head>
 <body>
 <noscript>Finora needs JavaScript.</noscript>
@@ -51,6 +51,8 @@
       <div class="stat"><span>In</span><b id="sum-in" class="pos"></b></div>
       <div class="stat"><span>Out</span><b id="sum-out" class="neg"></b></div>
       <div class="stat"><span>Invested</span><b id="sum-inv" class="inv"></b></div>
+      <div class="stat"><span>Saved (cash)</span><b id="sum-save" class="save"></b></div>
+      <div class="stat" id="moved-tile" hidden><span>Moved</span><b id="sum-move" class="move"></b></div>
       <div class="stat"><span>Left</span><b id="sum-net"></b></div>
     </div>
     <div id="cal" class="cal" role="grid" aria-label="Calendar"></div>
@@ -75,10 +77,12 @@
   <section id="view-add" class="view" hidden>
     <h2 id="add-title">Add entry</h2>
     <form id="add-form" class="card" autocomplete="off">
-      <div class="seg">
+      <div class="seg kinds">
         <label><input type="radio" name="kind" value="expense" checked> Expense</label>
         <label><input type="radio" name="kind" value="income"> Income</label>
         <label class="inv-opt"><input type="radio" name="kind" value="invest"> Investment</label>
+        <label class="save-opt"><input type="radio" name="kind" value="save"> Save</label>
+        <label class="move-opt"><input type="radio" name="kind" value="move"> Move</label>
       </div>
       <p class="field-label">Who</p>
       <div class="seg">
@@ -86,7 +90,14 @@
         <label><input type="radio" name="person" value="M"> M</label>
       </div>
       <label>Amount <input name="amount" inputmode="decimal" required pattern="[0-9]+([.,][0-9]{1,2})?" maxlength="12"></label>
-      <label>Category <select name="category" required></select></label>
+      <div id="to-wrap" hidden>
+        <p class="field-label">To whom</p>
+        <div class="seg">
+          <label><input type="radio" name="to" value="A"> A</label>
+          <label><input type="radio" name="to" value="M" checked> M</label>
+        </div>
+      </div>
+      <label id="cat-wrap">Category <select name="category" required></select></label>
       <label id="sub-wrap">Sub-cost <select name="sub"></select></label>
       <label>Note <input name="note" maxlength="100"></label>
       <label>Repeats

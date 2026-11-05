@@ -26,7 +26,8 @@
     'Loans & Debt': ['Bank Loan Repayments'],
     'Bank': ['Bank Account Fee'],
   };
-  const CATEGORIES = { expense: EXPENSES, income: { 'Salary': [] }, invest: { 'Investment': [] } };
+  // save: cash taken out of the balance. move: money passed from one person's balance to the other's.
+  const CATEGORIES = { expense: EXPENSES, income: { 'Salary': [] }, invest: { 'Investment': [] }, save: { 'Cash': [] }, move: { 'Transfer': [] } };
   const enc = new TextEncoder();
   const dec = new TextDecoder();
   const $ = (id) => document.getElementById(id);
@@ -75,7 +76,8 @@
 
   const emptyData = () => ({ v: 1, currency: 'EUR', currencyAt: 0, items: {} });
   const uid = () => b64(crypto.getRandomValues(new Uint8Array(12))).replace(/[+/=]/g, (c) => ({ '+': '-', '/': '_', '=': '' }[c]));
-  const live = (type) => Object.values(S.data.items).filter((i) => !i.deleted && i.type === type);
+  // Only items this version understands are shown; others are kept so they still sync.
+  const live = (type) => Object.values(S.data.items).filter((i) => !i.deleted && i.type === type && validItem(i));
 
   function put(item) {
     item.updatedAt = Date.now();
@@ -113,7 +115,8 @@
     if (!Number.isInteger(i.amount) || i.amount < 0 || i.amount > 1e11) return false;
     if (typeof i.category !== 'string' || i.category.length > 40) return false;
     if (i.type === 'budget') return true;
-    if (!['income', 'expense', 'invest'].includes(i.kind) || !isDate(i.date)) return false;
+    if (!Object.hasOwn(CATEGORIES, i.kind) || !isDate(i.date)) return false;
+    if (i.kind === 'move' && (!PEOPLE.includes(i.to) || i.to === i.person)) return false;
     if (typeof i.note !== 'string' || i.note.length > 100) return false;
     if (i.sub != null && (typeof i.sub !== 'string' || i.sub.length > 60)) return false;
     if (i.person != null && !PEOPLE.includes(i.person)) return false;
@@ -121,11 +124,14 @@
     if (i.type === 'rec') return ['weekly', 'monthly'].includes(i.freq) && (i.end == null || isDate(i.end));
     return false;
   }
+  // An item from a newer app version: well-formed enough to carry along unchanged, never shown.
+  const keepable = (i) => i && typeof i === 'object' && typeof i.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(i.id)
+    && Number.isFinite(i.updatedAt) && JSON.stringify(i).length < 4000;
   function sanitize(d) {
     const out = emptyData();
     if (d && typeof d === 'object') {
       if (/^[A-Z]{3}$/.test(d.currency)) { out.currency = d.currency; out.currencyAt = Number(d.currencyAt) || 0; }
-      for (const i of Object.values(d.items || {})) if (validItem(i)) out.items[i.id] = i;
+      for (const i of Object.values(d.items || {})) if (validItem(i) || keepable(i)) out.items[i.id] = i;
     }
     return out;
   }
@@ -234,7 +240,7 @@
   }
 
   function monthEntries(month) {
-    const mine = (i) => !S.person || i.person === S.person;
+    const mine = (i) => !S.person || i.person === S.person || (i.kind === 'move' && i.to === S.person);
     const list = live('tx').filter((t) => ym(t.date) === month && mine(t)).map((t) => ({ ...t, recurring: false }));
     for (const r of live('rec').filter(mine)) for (const d of occurrences(r, month)) list.push({ ...r, date: d, recurring: true });
     return list.sort((a, b) => b.date.localeCompare(a.date));
@@ -259,12 +265,18 @@
 
     const entries = monthEntries(month);
     const total = (k) => entries.filter((e) => e.kind === k).reduce((s, e) => s + e.amount, 0);
-    const inn = total('income'), out = total('expense'), inv = total('invest');
+    const inn = total('income'), out = total('expense'), inv = total('invest'), saved = total('save');
+    // Moves only shift money between people, so they count only when one person is selected.
+    const moved = S.person ? entries.filter((e) => e.kind === 'move').reduce((s, e) => s + (e.to === S.person ? e.amount : -e.amount), 0) : 0;
+    const left = inn - out - inv - saved + moved;
     $('sum-in').textContent = money(inn);
     $('sum-out').textContent = money(out);
     $('sum-inv').textContent = money(inv);
-    $('sum-net').textContent = money(inn - out - inv);
-    $('sum-net').className = inn - out - inv < 0 ? 'neg' : 'pos';
+    $('sum-save').textContent = money(saved);
+    $('moved-tile').hidden = !S.person;
+    $('sum-move').textContent = (moved > 0 ? '+' : '') + money(moved);
+    $('sum-net').textContent = money(left);
+    $('sum-net').className = left < 0 ? 'neg' : 'pos';
 
     renderCalendar(month, entries);
     for (const kind of Object.keys(CHARTS)) renderChart(entries, kind);
@@ -284,9 +296,9 @@
     $('tx-title').textContent = S.day ? 'Transactions · ' + dayLabel(S.day) : 'Transactions';
     $('day-actions').hidden = !S.day;
     $('tx-list').replaceChildren(...(shown.length ? shown.map((e) => el('li', entryRow(e.id),
-      el('div', {}, el('div', { text: (e.sub || e.category) + (e.recurring ? ' ↻' : '') }), el('small', { class: 'muted', text: details(e, e.date) })),
+      el('div', {}, el('div', { text: entryTitle(e) + (e.recurring ? ' ↻' : '') }), el('small', { class: 'muted', text: details(e, e.date) })),
       el('div', { class: 'right' },
-        el('b', { class: KIND_CLASS[e.kind], text: (e.kind === 'income' ? '+' : '−') + money(e.amount) }),
+        el('b', { class: KIND_CLASS[e.kind], text: sign(e) + money(e.amount) }),
         e.recurring ? '' : el('button', { class: 'link', 'aria-label': 'Delete', text: '✕', onclick: (ev) => { ev.stopPropagation(); if (confirm('Delete this entry?')) remove(e.id); } }))))
       : [empty(S.day ? 'Nothing on this day.' : 'Nothing this month.')]));
 
@@ -323,6 +335,7 @@
     showView('add'); // resets the form first
     const f = $('add-form');
     f.kind.value = Object.hasOwn(CATEGORIES, item.kind) ? item.kind : 'expense';
+    if (item.kind === 'move') f.to.value = item.to;
     syncAddSelects();
     f.category.value = item.category;
     syncAddSelects();
@@ -345,7 +358,7 @@
     for (const r of live('rec')) groups[r.end && r.end < now ? 'Ended' : r.date > now ? 'Upcoming' : 'Active'].push(r);
     const range = (r) => `${dayLabel(r.date, true)} → ${r.end ? dayLabel(r.end, true) : 'no end'}`;
     const row = (r) => el('li', entryRow(r.id),
-      el('div', {}, el('div', { text: `${r.sub || r.category} · ${r.freq}` }), el('small', { class: 'muted', text: details(r, range(r)) })),
+      el('div', {}, el('div', { text: `${entryTitle(r)} · ${r.freq}` }), el('small', { class: 'muted', text: details(r, range(r)) })),
       el('div', { class: 'right' },
         el('b', { class: KIND_CLASS[r.kind], text: money(r.amount) }),
         r.end && r.end < now ? '' : el('button', { class: 'link', text: 'Stop', onclick: (ev) => { ev.stopPropagation(); if (confirm('End it today? Past months keep it.')) put({ ...r, end: now }); } }),
@@ -365,9 +378,12 @@
     if (!repeats) f.end.value = '';
   }
 
-  const KIND_CLASS = { income: 'pos', expense: 'neg', invest: 'inv' };
+  const KIND_CLASS = { income: 'pos', expense: 'neg', invest: 'inv', save: 'save', move: 'move' };
+  const entryTitle = (i) => i.kind === 'move' ? `Move ${i.person} → ${i.to}` : i.kind === 'save' ? 'Saved cash' : i.sub || i.category;
+  // Money in shows +, money out −. A move is + for the receiver, − for the sender, and unsigned in the All view.
+  const sign = (i) => i.kind === 'income' ? '+' : i.kind !== 'move' ? '−' : !S.person ? '' : i.to === S.person ? '+' : '−';
   // Second line of a list row: main category (when a sub-cost is shown above), when, who, note.
-  const details = (i, when) => [i.sub ? i.category : '', when, i.person, i.note].filter(Boolean).join(' · ');
+  const details = (i, when) => [i.sub ? i.category : '', when, i.kind === 'move' ? '' : i.person, i.note].filter(Boolean).join(' · ');
 
   function fillSelect(sel, names, keep) {
     sel.replaceChildren(...names.map((n) => el('option', { value: n, text: n })));
@@ -381,6 +397,11 @@
     const subs = cats[f.category.value] || [];
     fillSelect(f.sub, subs, f.sub.value);
     $('sub-wrap').hidden = !subs.length;
+    const isMove = f.kind.value === 'move';
+    $('to-wrap').hidden = !isMove;
+    $('cat-wrap').hidden = isMove;
+    // With two people, money always moves to the other one.
+    if (isMove && f.to.value === f.person.value) f.to.value = PEOPLE.find((p) => p !== f.person.value);
   }
 
   const dayLabel = (d, year) => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) });
@@ -392,8 +413,9 @@
     const [y, m] = month.split('-').map(Number);
     const per = new Map();
     for (const e of entries) {
-      const t = per.get(e.date) || { in: 0, out: 0, inv: 0 };
-      if (e.kind === 'income') t.in += e.amount; else if (e.kind === 'invest') t.inv += e.amount; else t.out += e.amount;
+      if (e.kind === 'move') continue;
+      const t = per.get(e.date) || { in: 0, out: 0, inv: 0, save: 0 };
+      if (e.kind === 'income') t.in += e.amount; else if (e.kind === 'invest') t.inv += e.amount; else if (e.kind === 'save') t.save += e.amount; else t.out += e.amount;
       per.set(e.date, t);
     }
     const cells = [];
@@ -409,13 +431,14 @@
       const date = `${month}-${String(d).padStart(2, '0')}`;
       const t = per.get(date);
       const cls = ['day', date === now ? 'today' : '', date === S.day ? 'sel' : ''].join(' ').trim();
-      const label = dayLabel(date) + (t ? `: in ${money(t.in)}, out ${money(t.out)}, invested ${money(t.inv)}` : '');
+      const label = dayLabel(date) + (t ? `: in ${money(t.in)}, out ${money(t.out)}, invested ${money(t.inv)}, saved ${money(t.save)}` : '');
       cells.push(el('button', { class: cls, 'aria-label': label, 'aria-pressed': String(date === S.day),
         onclick: () => { S.day = S.day === date ? null : date; render(); } },
         el('span', { class: 'dn', text: String(d) }),
         t?.in ? el('span', { class: 'pos', text: '+' + short(t.in) }) : '',
         t?.out ? el('span', { class: 'neg', text: '−' + short(t.out) }) : '',
-        t?.inv ? el('span', { class: 'inv', text: '−' + short(t.inv) }) : ''));
+        t?.inv ? el('span', { class: 'inv', text: '−' + short(t.inv) }) : '',
+        t?.save ? el('span', { class: 'save', text: '−' + short(t.save) }) : ''));
     }
     $('cal').replaceChildren(...cells);
   }
@@ -572,7 +595,7 @@
     });
     $('prev').addEventListener('click', () => shift(-1));
     $('add-form').addEventListener('change', (e) => {
-      if (['kind', 'category'].includes(e.target.name)) syncAddSelects();
+      if (['kind', 'category', 'person'].includes(e.target.name)) syncAddSelects();
       if (e.target.name === 'freq') syncRepeatFields();
     });
     $('rec-add').addEventListener('click', () => {
@@ -595,11 +618,13 @@
       const subs = Object.hasOwn(cats, category) ? cats[category] : null;
       const sub = subs?.length ? f.sub.value : null;
       const person = PEOPLE.includes(f.person.value) ? f.person.value : null;
+      const to = kind === 'move' && PEOPLE.includes(f.to.value) && f.to.value !== person ? f.to.value : null;
+      if (kind === 'move' && !to) { toast('Choose who receives the money.'); return; }
       if (amount === null || !subs || (subs.length && !subs.includes(sub)) || !person || !isDate(f.date.value)) { toast('Check amount, category and date.'); return; }
       const end = f.freq.value === 'once' ? null : f.end.value || null;
       if (end && (!isDate(end) || end < f.date.value)) { toast('The end date must be on or after the start date.'); return; }
       const old = S.editId && S.data.items[S.editId];
-      const base = { id: old ? old.id : uid(), kind, amount, category, sub, person, note: clean(f.note.value, 100), date: f.date.value };
+      const base = { id: old ? old.id : uid(), kind, amount, category, sub, person, ...(to ? { to } : {}), note: clean(f.note.value, 100), date: f.date.value };
       if (f.freq.value === 'once') put({ ...base, type: 'tx' });
       else put({ ...base, type: 'rec', freq: f.freq.value === 'weekly' ? 'weekly' : 'monthly', end });
       if (old) { showView('month'); return; }
